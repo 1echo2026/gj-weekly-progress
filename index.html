@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>高经团队周进度核算</title>
+<link rel="stylesheet" href="assets/style.css">
+<style>
+  .bar-wrap { background: #f0f0f0; border-radius: 8px; height: 12px; overflow: hidden; min-width: 90px; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, #52c41a, #2f54eb); }
+  #teamTableWrap { max-height: 620px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; }
+  #teamTable tr.click { cursor: pointer; }
+  #teamTable tr.click:hover td { background: #f0f5ff; }
+  .up-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .up-box { border: 1px solid var(--border); border-radius: 10px; padding: 12px; background: #fafafa; }
+  .up-box.ok { background: #f6ffed; border-color: #b7eb8f; }
+  .up-box h4 { margin: 0 0 8px; font-size: 13.5px; }
+  .up-box .dz-sm {
+    border: 2px dashed #b7c4f5; border-radius: 8px; background: #f8faff;
+    padding: 14px; text-align: center; cursor: pointer; font-size: 13px; line-height: 1.8;
+  }
+  .up-box .dz-sm:hover, .up-box .dz-sm.drag { border-color: var(--blue); background: #eef3ff; }
+  .up-box .files { margin-top: 8px; font-size: 12.5px; }
+  .up-box .files .f { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; }
+  .up-box .files .f button { border: none; background: none; color: var(--red); cursor: pointer; font-size: 12px; }
+  .up-box .detected { margin-top: 8px; font-size: 12px; color: #595959; background: #fff; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; line-height: 1.7; }
+  .params select { padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 13px; background: #fff; }
+  #unmatchedModal .modal-box { max-width: 820px; }
+  #detailModal .modal-box { max-width: 900px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <h1>📊 高经团队周进度核算</h1>
+    <p class="sub">上传已核对完成的「有效订单池」+ 一份带高经的「高经业绩」底表 → 按新用户id匹配出每笔订单的高经 → 数透「高经团队 × 订单金额（求和）」。全部在浏览器本地计算,文件不会上传服务器。</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 第 1 步:两个文件 -->
+  <section class="card-panel">
+    <h2><span class="step">1</span> 上传两张表(拖入或点击选择)</h2>
+    <div class="up-grid">
+      <div class="up-box" id="poolBox">
+        <h4>① 有效订单池.xlsx <span class="muted">(强基/升学可一起传,自动合并)</span></h4>
+        <div class="dz-sm" id="poolDrop">
+          <div>📂 点击选择或拖入「有效订单池」Excel</div>
+          <div class="muted">识别含"账号ID / 订单ID"表头的订单池表</div>
+        </div>
+        <input type="file" id="poolInput" accept=".xlsx,.xls" multiple style="display:none">
+        <div class="files" id="poolFiles"></div>
+      </div>
+      <div class="up-box" id="mapBox">
+        <h4>② 高经业绩.xlsx <span class="muted">(带高经团队的底表)</span></h4>
+        <div class="dz-sm" id="mapDrop">
+          <div>📂 点击选择或拖入「高经业绩」Excel</div>
+          <div class="muted">识别含"高经"列与用户id列的底表</div>
+        </div>
+        <input type="file" id="mapInput" accept=".xlsx,.xls" style="display:none">
+        <div class="files" id="mapFiles"></div>
+        <div class="detected" id="mapDetected" style="display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 第 2 步:参数 -->
+  <section class="card-panel">
+    <h2><span class="step">2</span> 核算周期与去重口径</h2>
+    <div class="params">
+      <label>活动周期名称(用于结果标题与导出文件名,如 9.17-9.23)
+        <input id="period" type="text" value="">
+      </label>
+      <label>订单起始时间(按业绩归属时间,留空不限)
+        <input id="orderStart" type="datetime-local">
+      </label>
+      <label>订单结束时间(留空不限)
+        <input id="orderEnd" type="datetime-local">
+      </label>
+      <label>重复项处理
+        <select id="dedupeMode">
+          <option value="none">不去重(推荐:有效订单池已剔除无效/重复抽奖)</option>
+          <option value="orderItem">按「订单ID+商品ID」去重(去掉真重复行)</option>
+          <option value="order">按「订单ID」去重(会合并同订单的多个商品行)</option>
+          <option value="phone">按「手机号」去重(订单池手机号为打码,不推荐)</option>
+        </select>
+      </label>
+    </div>
+    <div class="rules muted">
+      匹配口径:① 用订单池的<b>账号ID</b>去匹配底表的<b>用户id</b>列,取出该行的高经/基地/基地负责人/经理;② 匹配不到的订单计入"未匹配订单",在结果中单独列出并可导出;③ 一个用户id在底表中对应多个高经时以首次出现为准(实测本文件无冲突)。<br>
+      说明:「有效订单池」已是审核后的有效集合(无效订单、重复抽奖在审核阶段已按手机号剔除),默认不再二次去重。
+    </div>
+    <button id="btnRun" class="btn primary">▶ 开始匹配并数透</button>
+    <div id="log" class="log"></div>
+  </section>
+
+  <!-- 结果 -->
+  <section id="results" class="card-panel" style="display:none">
+    <h2><span class="step">3</span> 高经团队数透结果</h2>
+    <div id="stats" class="stats"></div>
+    <button id="btnDownload" class="btn gold">⬇ 导出核算结果 Excel</button>
+    <p class="muted">导出文件包含:高经团队数透(高经 × 订单金额求和) + 订单明细(订单池原始列 + 匹配出的高经/基地/负责人/经理) + 未匹配订单(如有)。</p>
+    <div class="toolbar">
+      <input id="searchTeam" class="search" type="text" placeholder="🔍 查找 高经/基地/经理/销售姓名/用户id…">
+      <span class="muted">点击高经行查看该团队的订单明细</span>
+    </div>
+    <div id="teamTableWrap"><div id="teamTable"></div></div>
+  </section>
+
+  <footer class="foot muted">纯静态页面 · 基于 SheetJS 本地解析 Excel · 数透结果可直接导出 Excel</footer>
+</main>
+
+<!-- 高经团队订单明细弹窗 -->
+<div id="detailModal" class="modal-mask" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="detailModalTitle"></span>
+      <button type="button" id="detailModalClose" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="detailModalBody"></div>
+  </div>
+</div>
+
+<!-- 未匹配订单弹窗 -->
+<div id="unmatchedModal" class="modal-mask" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>❓ 未匹配到高经的订单</span>
+      <button type="button" id="unmatchedModalClose" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="unmatchedModalBody"></div>
+  </div>
+</div>
+
+<script src="assets/xlsx.bundle.js"></script>
+<script src="assets/audit-core.js"></script>
+<script src="assets/team-progress.js"></script>
+</body>
+</html>
