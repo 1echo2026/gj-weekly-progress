@@ -27,6 +27,20 @@
   .params select { padding: 8px 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 13px; background: #fff; }
   #unmatchedModal .modal-box { max-width: 820px; }
   #detailModal .modal-box { max-width: 900px; }
+  #goalModal .modal-box { max-width: 560px; }
+  #goalModal textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 13px; line-height: 1.7; resize: vertical; }
+  .goal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 10px 0 12px; padding: 10px 12px; background: #f8faff; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+  .goal-bar input[type="number"] { width: 64px; padding: 5px 8px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 13px; text-align: center; }
+  .btn.xs { padding: 4px 10px; font-size: 12.5px; }
+  input.goal-in { width: 98px; padding: 4px 8px; border: 1px solid #d9d9d9; border-radius: 5px; font-size: 12.5px; text-align: right; }
+  input.goal-in:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(47,84,235,.12); }
+  input.goal-week.manual { background: #fffbe6; border-color: #ffe58f; }
+  button.goal-reset { border: none; background: none; color: #faad14; cursor: pointer; font-size: 13px; padding: 0 2px; }
+  .rate-hi { color: var(--green); font-weight: 600; }
+  .rate-mid { color: var(--blue); font-weight: 600; }
+  .rate-low { color: #fa8c16; font-weight: 600; }
+  .bar-fill.warn { background: #fa8c16; }
+  .bar-fill.nogoal { background: #d9d9d9; }
 </style>
 </head>
 <body>
@@ -98,6 +112,16 @@
   <!-- 结果 -->
   <section id="results" class="card-panel" style="display:none">
     <h2><span class="step">3</span> 高经团队数透结果</h2>
+    <div class="goal-bar" id="goalBar">
+      <span>📌 折算口径:<b>周目标 = 月目标 ÷</b>
+        <input id="monthDays" type="number" min="28" max="31" step="1">
+        <b>天 × 7</b>
+      </span>
+      <span class="muted" id="monthLabel"></span>
+      <button id="btnDaysReset" class="btn plain xs" type="button">恢复自然月天数</button>
+      <button id="btnGoalPaste" class="btn plain xs" type="button">批量粘贴月目标</button>
+      <span class="muted">在表格里直接填月目标即自动折算周目标;周目标也可手动改写,改写后停止自动折算(点 ↺ 恢复)。月目标会保存在本机浏览器。</span>
+    </div>
     <div id="stats" class="stats"></div>
     <button id="btnDownload" class="btn gold">⬇ 导出核算结果 Excel</button>
     <p class="muted">导出文件包含:高经团队数透(高经 × 订单金额求和) + 订单明细(订单池原始列 + 匹配出的高经/基地/负责人/经理) + 未匹配订单(如有)。</p>
@@ -130,6 +154,22 @@
       <button type="button" id="unmatchedModalClose" class="modal-close">✕</button>
     </div>
     <div class="modal-body" id="unmatchedModalBody"></div>
+  </div>
+</div>
+
+<!-- 批量粘贴月目标弹窗 -->
+<div id="goalModal" class="modal-mask" style="display:none">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>📋 批量粘贴月目标</span>
+      <button type="button" id="goalModalClose" class="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted" style="margin-top:0">每行一个团队,格式「高经 月目标」。支持从 Excel 直接粘贴两列(Tab 分隔),也支持逗号或空格分隔,例如:<br><code>宋豫辉&nbsp;&nbsp;300000</code> / <code>梁鹏,200000</code>。仅会填入本次数透中存在的高经,周目标自动折算。</p>
+      <textarea id="goalPaste" rows="9" placeholder="宋豫杰&#9;300000&#10;梁鹏&#9;200000&#10;于帅帅,150000"></textarea>
+      <div id="goalPasteMsg" class="log" style="margin:8px 0"></div>
+      <button type="button" id="goalPasteApply" class="btn primary">应用</button>
+    </div>
   </div>
 </div>
 
