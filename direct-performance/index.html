@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>销售直推业绩看板</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+  if (!window.XLSX) {
+    document.write('<script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"><\/script>');
+  }
+</script>
+<style>
+  :root {
+    --bg: #f2f4f8;
+    --surface: #ffffff;
+    --surface-2: #f7f9fc;
+    --ink: #0d1b2e;
+    --ink-2: #34465f;
+    --muted: #6b7a90;
+    --line: #e3e8f0;
+    --line-strong: #d3dae6;
+    --primary: #14324f;
+    --primary-2: #1e4a76;
+    --accent: #2e6bdf;
+    --accent-soft: #eaf1fd;
+    --good: #1d8a5f;
+    --good-soft: #e7f5ee;
+    --warn: #c27a16;
+    --warn-soft: #fbf1e2;
+    --gold: #9a6b12;
+    --gold-soft: #f6edd9;
+    --shadow: 0 1px 2px rgba(16, 42, 67, .06), 0 4px 16px rgba(16, 42, 67, .05);
+    --shadow-lg: 0 12px 40px rgba(16, 42, 67, .18);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font-sans: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-num: "Manrope", "Noto Sans SC", sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(1200px 500px at 80% -10%, rgba(46, 107, 223, .06), transparent 60%),
+      radial-gradient(900px 400px at 10% -10%, rgba(20, 50, 79, .06), transparent 60%);
+    z-index: 0;
+  }
+
+  /* ---------- Topbar ---------- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 32px;
+    background: rgba(255, 255, 255, .85);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 15px; letter-spacing: .2px; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+    display: grid; place-items: center; color: #fff; font-size: 15px; font-weight: 800;
+    box-shadow: 0 2px 6px rgba(20, 50, 79, .28);
+  }
+  .topbar .meta { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+
+  /* ---------- Layout ---------- */
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 36px 32px 80px;
+  }
+
+  .hero { margin-bottom: 28px; animation: rise .5s ease both; }
+  .hero .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 10px;
+  }
+  .hero .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--accent); border-radius: 2px; }
+  .hero h1 { font-size: 28px; font-weight: 800; letter-spacing: -.3px; color: var(--ink); }
+  .hero p { color: var(--muted); margin-top: 8px; max-width: 640px; font-size: 14.5px; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px 26px;
+    margin-bottom: 20px;
+    animation: rise .5s ease both;
+  }
+  .card + .card { animation-delay: .06s; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; }
+  .card-title { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15.5px; }
+  .step {
+    width: 24px; height: 24px; border-radius: 7px;
+    background: var(--primary); color: #fff; font-size: 12.5px; font-weight: 700;
+    display: grid; place-items: center; font-family: var(--font-num);
+  }
+  .card-desc { color: var(--muted); font-size: 12.5px; }
+
+  /* ---------- Upload ---------- */
+  .upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .upload-grid { grid-template-columns: 1fr; } }
+
+  .dropzone {
+    position: relative;
+    border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius-sm);
+    padding: 26px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .18s, background .18s, transform .18s;
+    background: var(--surface-2);
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--accent-soft); }
+  .dropzone .dz-icon {
+    width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--line);
+    display: grid; place-items: center; color: var(--accent); font-size: 19px;
+  }
+  .dropzone .dz-title { font-weight: 600; font-size: 14px; color: var(--ink-2); }
+  .dropzone .dz-hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+  .dropzone .dz-file { margin-top: 8px; font-size: 12.5px; color: var(--accent); font-weight: 600; }
+  .dropzone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .dropzone.has-file { border-style: solid; border-color: var(--good); background: var(--good-soft); }
+  .dropzone.has-file .dz-icon { color: var(--good); border-color: var(--good); }
+
+  /* ---------- Mapping ---------- */
+  .mapping { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 18px; }
+  .mapping h4 { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 12px; }
+  .map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .map-field label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .map-field select {
+    width: 100%; padding: 9px 10px; border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm); background: #fff; font-size: 13px; color: var(--ink);
+    font-family: var(--font-sans); appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7a90' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  .map-field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-radius: var(--radius-sm);
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; transition: all .16s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(20, 50, 79, .24); }
+  .btn-primary:hover { background: var(--primary-2); }
+  .btn-accent { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(46, 107, 223, .24); }
+  .btn-accent:hover { filter: brightness(1.06); }
+  .btn-ghost { background: #fff; color: var(--ink-2); border-color: var(--line-strong); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 6px 12px; font-size: 12.5px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ---------- Stats ---------- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .stat { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; }
+  .stat .s-label { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .stat .s-value { font-family: var(--font-num); font-size: 22px; font-weight: 800; letter-spacing: -.4px; margin-top: 3px; color: var(--ink); }
+  .stat .s-value.accent { color: var(--accent); }
+  .stat .s-value.good { color: var(--good); }
+
+  /* ---------- Table ---------- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  table { width: 100%; border-collapse: collapse; min-width: 720px; }
+  thead th {
+    position: sticky; top: 0;
+    background: var(--surface-2);
+    text-align: left; font-size: 12px; font-weight: 700; letter-spacing: .3px;
+    color: var(--muted); text-transform: uppercase;
+    padding: 11px 14px; border-bottom: 1px solid var(--line); white-space: nowrap;
+  }
+  thead th.num, td.num { text-align: right; font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); font-size: 13.5px; color: var(--ink-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--surface-2); }
+  tbody td.num { color: var(--ink); font-weight: 700; }
+  tbody td.name { font-weight: 600; color: var(--ink); }
+  .empty-row td { text-align: center; color: var(--muted); padding: 40px; }
+
+  .badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  .badge.yixian { background: var(--accent-soft); color: var(--accent); }
+  .badge.jingli { background: var(--surface-2); color: var(--primary); border: 1px solid var(--line-strong); }
+  .badge.gaojing { background: var(--gold-soft); color: var(--gold); }
+  .badge.adj { background: var(--warn-soft); color: var(--warn); }
+
+  .rate-bar { display: flex; align-items: center; gap: 8px; }
+  .rate-track { flex: 1; min-width: 60px; height: 6px; border-radius: 4px; background: var(--line); overflow: hidden; }
+  .rate-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+  .rate-fill.over { background: var(--good); }
+  .rate-txt { font-family: var(--font-num); font-size: 12.5px; font-weight: 700; color: var(--ink-2); white-space: nowrap; }
+
+  .toolbar { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+  /* ---------- Modal ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(13, 27, 46, .45); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .overlay.open { display: flex; animation: fade .2s ease; }
+  .modal {
+    width: 100%; max-width: 560px; max-height: 88vh; overflow: hidden;
+    background: #fff; border-radius: 16px; box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; animation: pop .22s ease;
+  }
+  .modal-head { padding: 20px 24px 16px; border-bottom: 1px solid var(--line); }
+  .modal-head h3 { font-size: 17px; font-weight: 800; }
+  .modal-head p { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+  .modal-body { padding: 20px 24px; overflow-y: auto; }
+  .modal-foot { padding: 16px 24px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 10px; }
+
+  .form-group { margin-bottom: 18px; }
+  .form-group > label { display: block; font-size: 12.5px; font-weight: 700; color: var(--ink-2); margin-bottom: 7px; }
+  .form-group select, .form-group input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm); font-size: 13.5px; font-family: var(--font-sans); color: var(--ink);
+  }
+  .form-group select:focus, .form-group input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  .picker-search { position: sticky; top: 0; background: #fff; padding-bottom: 10px; z-index: 2; }
+  .picker-list { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .picker-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background .12s; }
+  .picker-item:last-child { border-bottom: none; }
+  .picker-item:hover { background: var(--surface-2); }
+  .picker-item input { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .picker-item .p-name { font-weight: 600; font-size: 13px; color: var(--ink); }
+  .picker-item .p-sub { font-size: 12px; color: var(--muted); margin-left: auto; }
+  .picker-empty { padding: 24px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  .sum-preview { background: var(--accent-soft); border: 1px solid #d6e4fb; border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 6px; }
+  .sum-preview .sp-row { display: flex; justify-content: space-between; align-items: baseline; }
+  .sum-preview .sp-label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .sum-preview .sp-value { font-family: var(--font-num); font-size: 22px; font-weight: 800; color: var(--accent); }
+
+  .override-list { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .override-list h4 { font-size: 13px; font-weight: 700; color: var(--ink-2); margin-bottom: 10px; }
+  .override-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--warn-soft); border: 1px solid #eedcba; border-radius: var(--radius-sm); margin-bottom: 8px; font-size: 13px; }
+  .override-item .ov-name { font-weight: 700; color: var(--warn); }
+  .override-item .ov-desc { color: var(--muted); font-size: 12px; }
+  .override-item .ov-del { margin-left: auto; color: #b3403a; cursor: pointer; font-weight: 700; font-size: 15px; padding: 0 4px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+    background: var(--ink); color: #fff; padding: 11px 20px; border-radius: 10px;
+    font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow-lg);
+    opacity: 0; pointer-events: none; transition: all .28s; z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .hint-note { font-size: 12px; color: var(--muted); margin-top: 12px; line-height: 1.7; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.97) translateY(6px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="mark">绩</span><span>销售直推业绩看板</span></div>
+    <div class="meta" id="top-meta">数据仅在本地浏览器内处理 · 不上传服务器</div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="eyebrow">Direct Performance Dashboard</div>
+      <h1>销售直推业绩看板</h1>
+      <p>导入订单池与销售名单，自动按姓名数透直推业绩并匹配回名单；针对特殊经理，可人工勾选其名下一线销售进行汇总。</p>
+    </section>
+
+    <!-- Step 1: Import -->
+    <section class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="step">1</span>导入数据</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-ghost btn-sm" id="btn-sample">载入示例数据</button>
+        </div>
+      </div>
+      <div class="upload-grid">
+        <div class="dropzone" id="dz-order">
+          <div class="dz-icon">📊</div>
+          <div class="dz-title">订单池业绩</div>
+          <div class="dz-hint">支持 .xlsx / .xls / .csv，需包含「姓名」与「业绩金额」列</div>
+          <div class="dz-file" id="order-file-name"></div>
+          <input type="file" id="order-file" accept=".xlsx,.xls,.csv" />
+        </div>
+        <div class="dropzone" id="dz-staff">
+          <div class="dz-icon">👥</div>
+          <div class="dz-title">销售名单</div>
+          <div class="dz-hint">支持 .xlsx / .xls / .csv，需包含「基地」「姓名」「目标」（可选「类别」）列</div>
+          <div class="dz-file" id="staff-file-name"></div>
+          <input type="file" id="staff-file" accept=".xlsx,.xls,.csv" />
+        </div>
+      </div>
+
+      <div class="mapping" id="mapping-box" hidden>
+        <h4>字段映射（已按列名自动识别，可手动调整）</h4>
+        <div class="map-grid">
+          <div class="map-field">
+            <label>订单池 · 姓名列（直推人）</label>
+            <select id="map-order-name"></select>
+          </div>
+          <div class="map-field">
+            <label>订单池 · 业绩金额列</label>
+            <select id="map-order-amount"></select>
+          </div>
+          <div class="map-field">
+            <label>名单 · 姓名列</label>
+            <select id="map-staff-name"></select>
+          </div>
+          <div class="map-field">
+            <label>名单 · 基地列</label>
+            <select id="map-staff-base"></select>
+          </div>
+          <div class="map-field">
+            <label>名单 · 目标列</label>
+            <select id="map-staff-target"></select>
+          </div>
+          <div class="map-field">
+            <label>名单 · 类别列（可选）</label>
+            <select id="map-staff-category"></select>
+          </div>
+        </div>
+        <div class="hint-note">
+          类别用于区分「一线 / 经理 / 高经」，若名单无此列可留空，架构调整时仍可人工选择。业绩金额支持带「￥」「,」等符号，会自动清洗。
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 2: Result -->
+    <section class="card" id="result-card" hidden>
+      <div class="card-head">
+        <div class="card-title"><span class="step">2</span>数透结果</div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-accent btn-sm" id="btn-adjust">⚙ 架构调整</button>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="table-wrap"><table id="result-table"></table></div>
+      <div class="toolbar">
+        <button class="btn btn-primary" id="btn-export-csv">导出 CSV</button>
+        <button class="btn btn-ghost" id="btn-export-xlsx">导出 Excel</button>
+        <button class="btn btn-ghost" id="btn-reset">重新导入</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Adjust modal -->
+  <div class="overlay" id="adjust-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>架构调整 · 特殊经理</h3>
+        <p>某位经理无法直接数透时，勾选其名下一线销售，以其直推业绩之和作为该经理业绩。</p>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>选择特殊经理</label>
+          <select id="adj-manager"></select>
+        </div>
+        <div class="form-group">
+          <label>勾选其名下一线销售</label>
+          <div class="picker-search">
+            <input type="text" id="adj-search" placeholder="搜索姓名 / 基地…" />
+          </div>
+          <div class="picker-list" id="adj-list"></div>
+        </div>
+        <div class="form-group">
+          <label>手动追加金额（可选）</label>
+          <input type="number" id="adj-extra" placeholder="0" step="0.01" />
+        </div>
+        <div class="sum-preview">
+          <div class="sp-row"><span class="sp-label">已勾选一线人数</span><span class="sp-value" id="adj-count">0 人</span></div>
+          <div class="sp-row" style="margin-top:6px;"><span class="sp-label">业绩合计（含追加）</span><span class="sp-value" id="adj-sum">¥0</span></div>
+        </div>
+
+        <div class="override-list" id="override-list" hidden>
+          <h4>已保存的架构调整</h4>
+          <div id="override-items"></div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-ghost" id="btn-adj-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-adj-save">保存调整</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- State ----------
+  let orderPool = null;     // { headers: [], data: [] }
+  let staffList = null;     // { headers: [], data: [] }
+  let overrides = {};       // { managerName: { members: [], extra: 0 } }
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Utilities ----------
+  function fmtMoney(n) {
+    n = Number(n) || 0;
+    return "¥" + n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtNum(n) {
+    n = Number(n) || 0;
+    return n.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function fmtPct(x) {
+    if (x == null) return "—";
+    return (x * 100).toFixed(1) + "%";
+  }
+  function toNumber(v) {
+    if (v == null) return 0;
+    if (typeof v === "number") return v;
+    let s = String(v).trim();
+    if (!s) return 0;
+    s = s.replace(/[￥¥,，\s]/g, "");
+    // handle parentheses negative: (123)
+    const neg = /^\(.*\)$/.test(s);
+    s = s.replace(/[()（）]/g, "");
+    const n = parseFloat(s);
+    if (isNaN(n)) return 0;
+    return neg ? -n : n;
+  }
+
+  function toast(msg) {
+    const t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => t.classList.remove("show"), 2200);
+  }
+
+  // ---------- Column detection ----------
+  function pickHeader(headers, keywords) {
+    for (const kw of keywords) {
+      for (const h of headers) {
+        if (String(h).includes(kw)) return h;
+      }
+    }
+    return "";
+  }
+  const KW_NAME = ["姓名", "销售", "直推人", "顾问", "业务员", "伙伴", "代理人", "人员", "员工", "业务"];
+  const KW_AMOUNT = ["业绩", "金额", "保费", "标保", "直推", "出单", "总额", "数量", "单量"];
+  const KW_BASE = ["基地", "机构", "职场", "部门", "分公司", "区域", "地区"];
+  const KW_TARGET = ["目标", "指标", "任务", "考核"];
+  const KW_CATEGORY = ["类别", "职级", "身份", "类型", "级别", "层级", "岗位", "角色"];
+
+  function fillSelect(sel, headers, selected) {
+    sel.innerHTML = "";
+    const none = document.createElement("option");
+    none.value = "";
+    none.textContent = "（不选择）";
+    sel.appendChild(none);
+    headers.forEach(h => {
+      const o = document.createElement("option");
+      o.value = h;
+      o.textContent = h;
+      if (h === selected) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+
+  // ---------- File parsing ----------
+  async function parseFile(file) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    if (!rows.length) throw new Error("文件为空");
+    const headers = rows[0].map(h => String(h).trim()).filter(h => h !== "");
+    if (!headers.length) throw new Error("未读取到表头");
+    const data = rows.slice(1).map(r => {
+      const o = {};
+      headers.forEach((h, i) => { o[h] = r[i]; });
+      return o;
+    }).filter(r => headers.some(h => String(r[h] ?? "").trim() !== ""));
+    return { headers, data };
+  }
+
+  function refreshMapping() {
+    const box = $("mapping-box");
+    const ready = orderPool && staffList;
+    box.hidden = !ready;
+    if (!ready) return;
+
+    fillSelect($("map-order-name"), orderPool.headers, pickHeader(orderPool.headers, KW_NAME));
+    fillSelect($("map-order-amount"), orderPool.headers, pickHeader(orderPool.headers, KW_AMOUNT));
+    fillSelect($("map-staff-name"), staffList.headers, pickHeader(staffList.headers, KW_NAME));
+    fillSelect($("map-staff-base"), staffList.headers, pickHeader(staffList.headers, KW_BASE));
+    fillSelect($("map-staff-target"), staffList.headers, pickHeader(staffList.headers, KW_TARGET));
+    fillSelect($("map-staff-category"), staffList.headers, pickHeader(staffList.headers, KW_CATEGORY));
+
+    // auto compute whenever mapping changes
+    maybeCompute();
+  }
+
+  function getMapping() {
+    return {
+      orderName: $("map-order-name").value,
+      orderAmount: $("map-order-amount").value,
+      staffName: $("map-staff-name").value,
+      staffBase: $("map-staff-base").value,
+      staffTarget: $("map-staff-target").value,
+      staffCategory: $("map-staff-category").value,
+    };
+  }
+
+  // ---------- Pivot & compute ----------
+  function buildPivot() {
+    const m = getMapping();
+    const map = {};
+    if (!m.orderName || !m.orderAmount) return map;
+    orderPool.data.forEach(row => {
+      const name = String(row[m.orderName] ?? "").trim();
+      if (!name) return;
+      const amt = toNumber(row[m.orderAmount]);
+      map[name] = (map[name] || 0) + amt;
+    });
+    return map;
+  }
+
+  function categoryOf(v) {
+    const s = String(v ?? "").trim();
+    if (/高经|总监|区域总|大区/.test(s)) return { key: "gaojing", label: s || "高经" };
+    if (/经理|主管|主任/.test(s)) return { key: "jingli", label: s || "经理" };
+    if (/一线|销售|顾问|业务|伙伴|代理/.test(s)) return { key: "yixian", label: s || "一线" };
+    return { key: "yixian", label: s || "一线" };
+  }
+
+  function computeRows() {
+    const m = getMapping();
+    const pivot = buildPivot();
+    if (!staffList || !m.staffName) return [];
+    return staffList.data.map(row => {
+      const name = String(row[m.staffName] ?? "").trim();
+      const base = m.staffBase ? String(row[m.staffBase] ?? "").trim() : "";
+      const target = m.staffTarget ? toNumber(row[m.staffTarget]) : 0;
+      const catRaw = m.staffCategory ? String(row[m.staffCategory] ?? "").trim() : "";
+      const cat = categoryOf(catRaw);
+
+      let perf = pivot[name] || 0;
+      let adjusted = false;
+      let note = "";
+      if (overrides[name]) {
+        const ov = overrides[name];
+        const sum = (ov.members || []).reduce((s, mem) => s + (pivot[mem] || 0), 0);
+        perf = sum + (ov.extra || 0);
+        adjusted = true;
+        note = "架构调整 · 汇总 " + (ov.members || []).length + " 名一线";
+      }
+      const rate = target > 0 ? perf / target : null;
+      return { base, name, cat, target, perf, adjusted, note, rate };
+    });
+  }
+
+  function renderStats(rows) {
+    const total = rows.reduce((s, r) => s + r.perf, 0);
+    const withPerf = rows.filter(r => r.perf > 0).length;
+    const rated = rows.filter(r => r.rate != null);
+    const avgRate = rated.length ? rated.reduce((s, r) => s + r.rate, 0) / rated.length : null;
+    const adjCount = Object.keys(overrides).length;
+
+    $("stats").innerHTML = [
+      stat("名单人数", rows.length, ""),
+      stat("有业绩人数", withPerf, ""),
+      stat("直推业绩合计", fmtMoney(total), "accent"),
+      stat("平均达成率", avgRate == null ? "—" : fmtPct(avgRate), "good"),
+      stat("架构调整", adjCount + " 项", adjCount ? "accent" : ""),
+    ].join("");
+  }
+  function stat(label, value, cls) {
+    return `<div class="stat"><div class="s-label">${label}</div><div class="s-value ${cls}">${value}</div></div>`;
+  }
+
+  function renderTable(rows) {
+    const tbody = rows.length
+      ? rows.map(r => {
+          const rateHtml = r.rate == null
+            ? `<span class="rate-txt">—</span>`
+            : `<div class="rate-bar"><div class="rate-track"><div class="rate-fill ${r.rate >= 1 ? 'over' : ''}" style="width:${Math.min(100, r.rate * 100)}%"></div></div><span class="rate-txt">${fmtPct(r.rate)}</span></div>`;
+          const catBadge = r.cat.key === "gaojing"
+            ? `<span class="badge gaojing">${r.cat.label}</span>`
+            : r.cat.key === "jingli"
+              ? `<span class="badge jingli">${r.cat.label}</span>`
+              : `<span class="badge yixian">${r.cat.label}</span>`;
+          const adjBadge = r.adjusted ? ` <span class="badge adj">架构调整</span>` : "";
+          return `<tr>
+            <td>${esc(r.base || "—")}</td>
+            <td class="name">${esc(r.name)}</td>
+            <td>${catBadge}${adjBadge}</td>
+            <td class="num">${r.target ? fmtNum(r.target) : "—"}</td>
+            <td class="num">${fmtNum(r.perf)}</td>
+            <td>${rateHtml}</td>
+            <td style="font-size:12px;color:var(--muted)">${r.note ? esc(r.note) : "—"}</td>
+          </tr>`;
+        }).join("")
+      : `<tr class="empty-row"><td colspan="7">暂无数据，请导入名单并完成字段映射</td></tr>`;
+
+    $("result-table").innerHTML = `
+      <thead>
+        <tr>
+          <th>基地</th><th>姓名</th><th>类别</th>
+          <th class="num">目标</th><th class="num">直推业绩</th>
+          <th>达成率</th><th>备注</th>
+        </tr>
+      </thead>
+      <tbody>${tbody}</tbody>`;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function maybeCompute() {
+    const m = getMapping();
+    const ok = orderPool && staffList && m.orderName && m.orderAmount && m.staffName;
+    if (!ok) {
+      $("result-card").hidden = true;
+      return;
+    }
+    $("result-card").hidden = false;
+    const rows = computeRows();
+    renderStats(rows);
+    renderTable(rows);
+  }
+
+  // ---------- Export ----------
+  function currentRows() { return computeRows(); }
+
+  function exportCSV() {
+    const rows = currentRows();
+    const header = ["基地", "姓名", "类别", "目标", "直推业绩", "达成率", "备注"];
+    const lines = [header.join(",")];
+    rows.forEach(r => {
+      const cat = r.cat.label;
+      const cells = [r.base, r.name, cat, r.target, r.perf, r.rate == null ? "" : (r.rate * 100).toFixed(1) + "%", r.note];
+      lines.push(cells.map(c => {
+        let s = String(c == null ? "" : c);
+        if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      }).join(","));
+    });
+    download(new Blob(["\ufeff" + lines.join("\n")], { type: "text/csv;charset=utf-8" }), "直推业绩看板.csv");
+  }
+
+  function exportXLSX() {
+    const rows = currentRows();
+    const aoa = [["基地", "姓名", "类别", "目标", "直推业绩", "达成率", "备注"]];
+    rows.forEach(r => {
+      aoa.push([r.base, r.name, r.cat.label, r.target, r.perf, r.rate == null ? "" : (r.rate * 100).toFixed(1) + "%", r.note]);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "直推业绩");
+    XLSX.writeFile(wb, "直推业绩看板.xlsx");
+  }
+
+  function download(blob, name) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ---------- Adjust modal ----------
+  function openAdjust() {
+    const rows = currentRows();
+    if (!rows.length) { toast("请先导入数据"); return; }
+
+    // manager options: prefer 经理 category, fallback all
+    const managers = rows.filter(r => r.cat.key === "jingli");
+    const pool = managers.length ? managers : rows;
+    $("adj-manager").innerHTML = pool.map(r => `<option value="${esc(r.name)}">${esc(r.name)}${r.base ? " · " + esc(r.base) : ""}${r.cat.key === "jingli" ? "" : ""}</option>`).join("");
+
+    // reset
+    $("adj-search").value = "";
+    $("adj-extra").value = "";
+    adjState.selected = new Set();
+    adjState.manager = pool[0] ? pool[0].name : "";
+    renderPicker(rows);
+    renderOverrides();
+    updateSum();
+    $("adjust-overlay").classList.add("open");
+  }
+
+  const adjState = { selected: new Set(), manager: "" };
+
+  function renderPicker(allRows) {
+    const m = getMapping();
+    const cat = m.staffCategory;
+    // 一线候选：排除当前选中的经理，且类别不是高经（尽量只列一线/无类别者）
+    const q = $("adj-search").value.trim();
+    const list = allRows.filter(r => {
+      if (r.name === adjState.manager) return false;
+      if (cat && r.cat.key === "gaojing") return false; // 高经不参与一线汇总
+      if (q && !(r.name.includes(q) || (r.base || "").includes(q))) return false;
+      return true;
+    });
+
+    $("adj-list").innerHTML = list.length
+      ? list.map(r => {
+          const checked = adjState.selected.has(r.name) ? "checked" : "";
+          return `<label class="picker-item">
+            <input type="checkbox" data-name="${esc(r.name)}" ${checked} />
+            <span class="p-name">${esc(r.name)}</span>
+            <span class="p-sub">${r.base ? esc(r.base) + " · " : ""}${fmtNum(r.perf)}</span>
+          </label>`;
+        }).join("")
+      : `<div class="picker-empty">没有匹配的一线销售</div>`;
+  }
+
+  function updateSum() {
+    const pivot = buildPivot();
+    const members = Array.from(adjState.selected);
+    const sum = members.reduce((s, n) => s + (pivot[n] || 0), 0);
+    const extra = toNumber($("adj-extra").value);
+    $("adj-count").textContent = members.length + " 人";
+    $("adj-sum").textContent = fmtMoney(sum + extra);
+  }
+
+  function renderOverrides() {
+    const keys = Object.keys(overrides);
+    $("override-list").hidden = keys.length === 0;
+    $("override-items").innerHTML = keys.map(k => {
+      const ov = overrides[k];
+      const members = (ov.members || []).join("、");
+      return `<div class="override-item">
+        <span class="ov-name">${esc(k)}</span>
+        <span class="ov-desc">汇总 ${(ov.members || []).length} 名一线：${esc(members)}${ov.extra ? " + 追加 " + fmtNum(ov.extra) : ""}</span>
+        <span class="ov-del" data-del="${esc(k)}" title="删除">×</span>
+      </div>`;
+    }).join("");
+  }
+
+  // ---------- Sample data ----------
+  function loadSample() {
+    const orderHeaders = ["订单号", "销售姓名", "业绩金额"];
+    const orderData = [
+      ["A1001", "张伟", 32000], ["A1002", "李娜", 18500], ["A1003", "王强", 26800],
+      ["A1004", "赵敏", 41200], ["A1005", "钱进", 15300], ["A1006", "孙丽", 22900],
+      ["A1007", "张伟", 27500], ["A1008", "李娜", 33800], ["A1009", "王强", 19600],
+      ["A1010", "赵敏", 24400], ["A1011", "钱进", 36700], ["A1012", "孙丽", 31800],
+      ["A1013", "张伟", 12900], ["A1014", "李娜", 14200], ["A1015", "王强", 20500],
+      ["A1016", "赵敏", 38900], ["A1017", "陈经理", 52000], ["A1018", "周高经", 68000],
+      ["A1019", "钱进", 11200], ["A1020", "孙丽", 17400],
+    ];
+    const staffHeaders = ["基地", "姓名", "类别", "目标"];
+    const staffData = [
+      ["上海基地", "张伟", "一线", 200000], ["上海基地", "李娜", "一线", 180000],
+      ["上海基地", "王强", "一线", 220000], ["上海基地", "赵敏", "一线", 210000],
+      ["上海基地", "钱进", "一线", 190000], ["上海基地", "孙丽", "一线", 200000],
+      ["上海基地", "陈经理", "经理", 500000], ["上海基地", "刘经理", "经理", 400000],
+      ["上海基地", "周高经", "高经", 800000], ["上海基地", "吴高经", "高经", 700000],
+    ];
+    orderPool = { headers: orderHeaders, data: orderData.map(r => ({ "订单号": r[0], "销售姓名": r[1], "业绩金额": r[2] })) };
+    staffList = { headers: staffHeaders, data: staffData.map(r => ({ "基地": r[0], "姓名": r[1], "类别": r[2], "目标": r[3] })) };
+    overrides = {};
+
+    $("order-file-name").textContent = "示例订单池 · 20 条";
+    $("order-file-name").parentElement.classList.add("has-file");
+    $("staff-file-name").textContent = "示例名单 · 10 人";
+    $("staff-file-name").parentElement.classList.add("has-file");
+
+    refreshMapping();
+    toast("已载入示例数据");
+  }
+
+  // ---------- Events ----------
+  function bindDropzone(dzId, fileId, nameId, onLoaded) {
+    const dz = $(dzId), input = $(fileId), nameEl = $(nameId);
+    dz.addEventListener("dragover", e => { e.preventDefault(); dz.classList.add("dragover"); });
+    dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+    dz.addEventListener("drop", e => {
+      e.preventDefault();
+      dz.classList.remove("dragover");
+      const f = e.dataTransfer.files[0];
+      if (f) handleFile(f);
+    });
+    input.addEventListener("change", () => { if (input.files[0]) handleFile(input.files[0]); });
+
+    async function handleFile(f) {
+      try {
+        const parsed = await parseFile(f);
+        onLoaded(parsed);
+        nameEl.textContent = f.name + " · " + parsed.data.length + " 行";
+        dz.classList.add("has-file");
+        refreshMapping();
+        toast("已读取 " + f.name);
+      } catch (err) {
+        toast("读取失败：" + (err.message || "未知错误"));
+      }
+    }
+  }
+
+  bindDropzone("dz-order", "order-file", "order-file-name", p => { orderPool = p; });
+  bindDropzone("dz-staff", "staff-file", "staff-file-name", p => { staffList = p; });
+
+  // mapping change -> recompute
+  ["map-order-name", "map-order-amount", "map-staff-name", "map-staff-base", "map-staff-target", "map-staff-category"]
+    .forEach(id => $(id).addEventListener("change", maybeCompute));
+
+  $("btn-sample").addEventListener("click", loadSample);
+  $("btn-export-csv").addEventListener("click", exportCSV);
+  $("btn-export-xlsx").addEventListener("click", exportXLSX);
+  $("btn-reset").addEventListener("click", () => location.reload());
+
+  // adjust modal
+  $("btn-adjust").addEventListener("click", openAdjust);
+  $("btn-adj-cancel").addEventListener("click", () => $("adjust-overlay").classList.remove("open"));
+  $("adjust-overlay").addEventListener("click", e => { if (e.target === $("adjust-overlay")) $("adjust-overlay").classList.remove("open"); });
+
+  $("adj-manager").addEventListener("change", e => { adjState.manager = e.target.value; renderPicker(currentRows()); });
+  $("adj-search").addEventListener("input", () => renderPicker(currentRows()));
+  $("adj-extra").addEventListener("input", updateSum);
+
+  $("adj-list").addEventListener("change", e => {
+    const cb = e.target;
+    if (cb.tagName === "INPUT" && cb.dataset.name) {
+      if (cb.checked) adjState.selected.add(cb.dataset.name);
+      else adjState.selected.delete(cb.dataset.name);
+      updateSum();
+    }
+  });
+
+  $("override-items").addEventListener("click", e => {
+    const del = e.target.closest(".ov-del");
+    if (del && del.dataset.del) {
+      delete overrides[del.dataset.del];
+      renderOverrides();
+      maybeCompute();
+      toast("已删除调整");
+    }
+  });
+
+  $("btn-adj-save").addEventListener("click", () => {
+    const manager = adjState.manager;
+    const members = Array.from(adjState.selected);
+    const extra = toNumber($("adj-extra").value);
+    if (!manager) { toast("请选择经理"); return; }
+    if (!members.length && extra === 0) { toast("请至少勾选一名一线或填写追加金额"); return; }
+    overrides[manager] = { members, extra };
+    $("adjust-overlay").classList.remove("open");
+    maybeCompute();
+    toast("已保存「" + manager + "」的架构调整");
+  });
+
+  // keyboard: esc closes modal
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") $("adjust-overlay").classList.remove("open");
+  });
+
+  // date in topbar
+  const now = new Date();
+  $("top-meta").textContent = "数据仅在本地浏览器内处理 · 不上传服务器 · " +
+    now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+
+})();
+</script>
+</body>
+</html>
